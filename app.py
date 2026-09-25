@@ -74,9 +74,6 @@ if df_raw.empty:
     st.error("Failed to retrieve market data. Check ticker symbols.")
     st.stop()
 
-df_prices = df_raw.dropna()
-returns = df_prices.pct_change().dropna()
-
 sp500_returns = returns["^GSPC"]
 asset_returns = returns[tickers]
 portfolio_returns = (asset_returns * weights).sum(axis=1)
@@ -85,8 +82,8 @@ portfolio_returns = (asset_returns * weights).sum(axis=1)
 trading_days = 252
 annual_return = portfolio_returns.mean() * trading_days
 annual_volatility = portfolio_returns.std() * np.sqrt(trading_days)
-sharpe_ratio = (
-    (annual_return - risk_free_rate)
+sharpe_ratio = (0
+    (annual_return - risk_free_rate) / annual_volatility
     if annual_volatility > 0
     else 0
 )
