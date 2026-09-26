@@ -3,6 +3,13 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+ticker = input("Enter ticker symbol (e.g, AAPL, NVDA, TSLA, GOOGL): ").strip().upper()
+start_date = input("Enter start date (YYYY-MM-DD): ").strip()
+end_date = input("Enter end date (YYYY-MM-DD): ").strip()
+
+
+
+
 def get_stock_data(ticker, start_date, end_date):
     # Downloads Stock Data from Yahoo Finance
      
@@ -15,14 +22,13 @@ def get_stock_data(ticker, start_date, end_date):
     return df
 
 # Test fetching data for Apple
-df = get_stock_data("AAPL", "2023-01-01", "2024-01-01")
-print(df.head())
+df = get_stock_data(ticker, start_date, end_date)
 
 # Calculate daily percent change: (Price today - Price yesterday) / price yesterday
 df['Daily_Return']  = df['Close'].pct_change()
 
 # Look at the first 5 rows to verify
-print(df.head())
+# print(df.head())
 
 # Calculate 21 Day rolling volatility (annualized)
 df['Volatility_21D'] = df['Daily_Return'].rolling(window=21).std() * (252 ** 0.5)
@@ -53,10 +59,9 @@ def print_report(df, ticker, risk_free_rate=0.04):
     annual_return = clean_returns.mean() * 252 
 
     # Annual Volaitlity (std scaled to 252 trading days)
-    annual_volatility = clean_returns.std() * 252 (252 ** 0.5)
+    annual_volatility = clean_returns.std() * (252 ** 0.5)
 
     # Sharpe ratio 
-    
     sharpe_ratio = (annual_return - risk_free_rate) / annual_volatility
 
     # Max drawdown
@@ -72,8 +77,7 @@ def print_report(df, ticker, risk_free_rate=0.04):
     print(f" Max Drawdown: {max_drawdown * 100:>8.2f}%")
     print("=" * 45 + "\n")
 
-    # Run the summary function on you dataset
-    print_report(df, "AAPL")
+
 
 # Matplot lib
 def plot_risk_dashboard(df, ticker):
@@ -105,7 +109,7 @@ def plot_risk_dashboard(df, ticker):
     plt.tight_layout()
     plt.show()
 
-# Call the plot function
-plot_risk_dashboard(df, "AAPL")
+print_report(df, ticker)
+plot_risk_dashboard(df, ticker)
 
 
