@@ -55,20 +55,14 @@ risk_free_rate = (
 # Fetch Data 
 @st.cache_data(ttl=3600)
 def fetch_data(ticker_list, period):
-    # Fetch user assets plus ^GSPC for benchmark calculations
     all_tickers = list(set(ticker_list + ["^GSPC"]))
     data = yf.download(all_tickers, period=period)["Close"]
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.droplevel(0)
     return data
 
 with st.spinner("Fetching market data..."):
     df_raw = fetch_data(tickers, time_horizon)
-
-if df_raw.empty:
-    st.error("Failed to retrieve market data. Check ticker symbols.")
-    st.stop()
-
-df_prices = df_raw.dropna()
-returns = df_prices.pct_change().dropna()
 
 if df_raw.empty:
     st.error("Failed to retrieve market data. Check ticker symbols.")
@@ -86,7 +80,7 @@ trading_days = 252
 annual_return = portfolio_returns.mean() * trading_days
 annual_volatility = portfolio_returns.std() * np.sqrt(trading_days)
 sharpe_ratio = (
-    (annual_return - risk_free_rate)
+    (annual_return - risk_free_rate) / annual_volatility
     if annual_volatility > 0
     else 0
 )
@@ -175,7 +169,6 @@ var_95 = np.percentile(portfolio_returns, 5) * 100
 cvar_95 = portfolio_returns[portfolio_returns <= (var_95 / 100)].mean() * 100
 
 col_d1, col_d2, col_d3 = st.columns(3)
-col_d1, cold_d2, cold_d3, = st.columns(3)
 col_d1.metric("Maximum Historical Drawdown", f"{max_drawdown:.2f}%")
 col_d2.metric("Daily 95% Value at Risk (VaR)", f"{var_95:.2f}%")
 col_d3.metric("Daily 95% Conditional VaR (CVaR)", f"{cvar_95:.2f}%")
@@ -247,4 +240,32 @@ col_res1, col_res2, col_res3 = st.columns(3)
 col_res1.metric("Conservative (10th Percentile)", f"${p10:,.2f}")
 col_res2.metric("Median Target (50th Percentile)", f"${p50:,.2f}")
 col_res3.metric("Optimistic (90th Percentile)", f"${p90:,.2f}")
+
+import scipy.optimize as sco
+
+# Function to calculate portfolio metrics for optimization
+def portfolio_performance(weights, mean_returns, cov_matrix, risk_free_rate):
+    returns = np.sum(mean_returns * weights) * 252
+    std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix * 252, weights)))
+    sharpe = (returns - risk_free_rate) / std
+    return returns, std, sharpe
+
+# Optimization target: Maximize Sharpe Ratio (Minimize Negative Sharpe)
+def min_func_sharpe(weights, mean_returns, cov_matrix, risk_free_rate):
+    return -portfolio_performance(weights, mean_returns, cov_matrix, risk_free_rate)[2]
+
+# Constraints & Bounds
+num_assets = len(tickers)
+args = (asset_returns.mean(), asset_returns.cov(), risk_free_rate)
+constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) -1})
+bounds = tuple((0.0, 1.0) for _ in range(num_assets))
+initial_guess = num_assets * [1.0 / num_assets,]
+
+# Run Scipy Optimization
+optimized_result = sco.minimize(min_func_sharpe, initial_guess, args=args, method='SLSQP', bounds=bounds, constraints=constraints)
+opt_weights = optimized_result.x
+
+st.subheader("Automated Mean-Variance Portfolio Optimization")
+df_opt = pd.DataFrame({"Ticker": tickers, "Current Weight": weights, "Optimal Weight (Max Sharpe)": opt_weights})
+st.dataframe(df_opt.style.format({"Current Weight": "{:.2%}", "Optimal Weight (Max Sharpe)": "{:.2%}"}))
 
