@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Page Setup
 st.set_page_config(page_title="Live Financial Portfolio and Stock Risk Analyzer", layout="wide")
@@ -33,104 +34,181 @@ def get_stock_data(symbol, start, end):
     return df
 
 # Run Analysis when user presses the button
+# Session State intitialized
+if 'run_analysis' not in st.session_state:
+    st.session_state.run_analysis = False
+
+# Update when the sidebar is pressed
 if st.sidebar.button("Run Risk Analysis"):
+    st.session_state.run_analysis = True
+
+# Check Session State instead of checking the button directly
+if st.session_state.run_analysis:
     df = get_stock_data(ticker, start_date, end_date)
 
     if df.empty:
         st.error(f"No Data found for ticker '{ticker}'. Please check the symbol and try again.")
+       
     else:
-        # Quant Calculations
+         # Quant Calculations
         df['Daily_Return'] = df['Close'].pct_change()
         df['Volatility_21D'] = df['Daily_Return'].rolling(window=21).std() * (252 ** 0.5)
         df['Cumulative_Return'] = (1 + df['Daily_Return']).cumprod()
         df['Peak'] = df['Cumulative_Return'].cummax()
         df['Drawdown'] = (df['Cumulative_Return'] - df['Peak']) / df['Peak']
-
+        
         # Clean returns for overall stats
         clean_returns = df['Daily_Return'].dropna()
         annual_return = clean_returns.mean() * 252
         annual_volatility = clean_returns.std() * (252 ** 0.5)
         sharpe_ratio = (annual_return - risk_free_rate) / annual_volatility
         max_drawdown = df['Drawdown'].min()
-
+        
         # Display Metric cards
         st.subheader(f"Key Risk metric for {ticker}")
-
+        
         # Streamlit metrics layout in 4 columns
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Annualized Return", f"{annual_return * 100:.2f}%")
         col2.metric("Annualized Volatility", f"{annual_volatility * 100:.2f}%")
         col3.metric("Sharpe Ratio", f"{sharpe_ratio:.2f}")
         col4.metric("Max Drawdown", f"{max_drawdown * 100:.2f}%")
-
+        
         st.markdown("---")
-
+        
         # Display Charts
         st.subheader("Visual Analysis Dashboard")
+        st.markdown("---")
+        st.header("Technical Analysis Indicators")
+        
+        # Moving Averages Calculation
+        df['SMA_50'] = df['Close'].rolling(window=50).mean()
+        df['SMA_200'] = df['Close'].rolling(window=200).mean()
+        
+        # RSI Calculation (14 day window)
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0,0)).rolling(window=14).mean()
+        rs = gain / loss
+        df['RSI'] = 100 - (100 / (1 + rs))
 
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
-
+        
         # Top Panel: Price
         ax1.plot(df.index, df['Close'], color="#D20FB5", linewidth=1.5, label='Close Price ($)' )
         ax1.set_title(f"{ticker} Historical Performance", fontsize=12, fontweight='bold')
         ax1.set_ylabel("Price ($)") 
         ax1.legend(loc='upper left')
         ax1.grid(True, linestyle='--', alpha=0.5)
-
+        
         # Middle Panel, Daily Returns
         ax2.plot(df.index, df['Daily_Return'], color="#79ee9c", alpha=0.6, label='Daily Returns')
         ax2.axhline(0, color='black', linestyle='--', linewidth=0.8)
         ax2.set_ylabel("Daily Change")
         ax2.legend(loc='upper left')
         ax2.grid(True, linestyle='--', alpha=0.5)   
-
+        
         # Bottom Panel: Drawdown
         ax3.fill_between(df.index,df['Drawdown'] * 100, 0, color="#DC0B0B", alpha=0.4, label='Drawdown (%)')
         ax3.set_ylabel("Drawdown %")
         ax3.set_xlabel("Date")
         ax3.legend(loc='lower left')
         ax3.grid(True, linestyle='--', alpha=0.5)
-
+        
         plt.tight_layout()
-
-        # Render matplotlib chart inside Streamlit page
         st.pyplot(fig)
 
-import seaborn as sns
+        # Multiselect widget for comparing multiple tickers
+        tickers = st.multiselect(
+            "Select stocks to compare:",
+            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "SPY"],
+            default=["AAPL", "MSFT", "SPY"],
+        )
 
-st.markdown("---")
-st.header("Multi-Stock Portoflio Comparison")
+        if tickers:
+            # Download data for all the selected tickers at the same time
+            comparison_df = yf.download(tickers, start=start_date, end=end_date)['Close']
 
-# Multiselect widget for comparing multiple tickers
-tickers = st.multiselect(
-    "Select stocks to compare:",
-    ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "SPY"],
-    default=["APPL", "MSFT", "SPY"]
-)
+            # Normalize prices to start at $100 so they can be compared fairly
+            normalized_df = (comparison_df / comparison_df.iloc[0]) * 100
 
-if tickers:
-    # Download data for all the selected tickers at the same time
-    comparison_df = yf.download(tickers, start=start_date, end=end_date)['Close']
+            # Plot normalized growth chart
+            st.subheader("Normalized Performance (Starting at $100)")
+            st.line_chart(normalized_df)
 
-    # Normalize prices to start at $100 so they can be compared fairly
-    normalized_df = (comparison_df / comparison_df.iloc[0]) * 100
+            # Calculate daily returns for correlation
+            comp_returns = comparison_df.pct_change().dropna()
+            correlation_matrix = comp_returns.corr()
 
-    # Plot normalized growth chart
-    st.subheader("Normalized Performance (Starting at $100)")
-    st.line_chart(normalized_df)
+            # Display Correlation Heatmap
+            st.subheader("Stock Return Correlation Matrix")
+            fig_corr, ax_corr = plt.subplots(figsize=(6,4))
+            sns.heatmap(correlation_matrix, annot=True, cmap= "coolwarm", vmin=-1, vmax=1, ax=ax_corr)
+            st.pyplot(fig_corr)
 
-    # Calculate daily returns for correlation
-    comp_returns = comparison_df.pct_change().dropna()
-    correlation_matrix = comp_returns.corr()
+        # Monte Carlo Risk Simulation
+        st.markdown("---")
+        st.header("Monte Carlo Risk Simulation (30-Day Outlook)")
 
-    # Display Correlation Heatmap
-    st.subheader("Stock Return Correlation Matrix")
-    fig_corr, ax_corr = plt.subplots(figsize=(6,4))
-    sns.heatmap(correlation_matrix, annot=True, cmap= "coolwarm", vmin=-1, vmax=1, ax=ax_corr)
-    st.pyplot(fig_corr)
+        if st.button("Run 1000 Path Simulation"):
+            num_simulations = 1000
+            time_horizon = 30 # forecast 30 days into the future
+
+            last_price = df['Close'].iloc[-1]
+            daily_mean = clean_returns.mean()
+            daily_std = clean_returns.std()
+
+            # Matrix to store simulation results
+            simulation_matrix = np.zeroes((time_horizon, num_simulations))
+
+            for i in range(num_simulations):
+                prices = [last_price]
+                for t in range(1, time_horizon):
+                    # Generate random return using normal distribution
+                    simulated_return = np.randpm.normal(daily_mean, daily_std)
+                    prices.append(prices[-1] * (1 + simulated_return))
+                simulation_matrix[:, i] = prices
+
+            # Plot Simulation Paths
+            fig_mc, ax_mc = plt.subplots(figsize=(10,5))
+            ax_mc.plot(simulation_matrix, color='blue', alpha=0.03)
+            ax_mc.set_title(f"1,000 Simulated Price Paths for {ticker} over Next 30 Days")
+            ax_mc.set_ylabel("Simulated Prices ($)")
+            ax_mc.set_xlabel("Days Ahead")
+            st.pyplot(fig_mc)
+
+            # Calculate 95% Value at Risk (VaR)
+            ending_prices = simulation_matrix[-1, :]
+            percentile_5th = np.percentile(ending_prices, 5)
+            max_expected_loss_pct = ((percentile_5th - last_price) / last_price) * 100
+
+            st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
+
+
+if st.sidebar.buttons("Run Risk Analysis"):
+    df = get_stock_data(ticker, start_date, end_date)
+
+    # Plot SMA Chart
+    fig_sma, ax_sma = plt.subplots(figsize=(10,4))
+    ax_sma.plot(df.index, df['Close'], label='Close Price', alpha=0.5)
+    ax_sma.plot(df.index, df['SMA_50'], label='50-Day SMA', color='orange')
+    ax_sma.plot(df.index, df['SMA_200'], label='200 Day SMA', color='red')
+    ax_sma.set_title(f"{ticker} Moving Averages")
+    ax_sma.legend()
+    ax_sma.grid(True, linestyle='--', alpha=0.5)
+    ax_sma.grid(True, linestyle='--', alpha=0.5)
+    st.pyplot(fig_sma)
+
+    # Plot RSI Chart
+    fig_rsi, ax_rsi = plt.subplots(figsizes=(10,3))
+    ax_rsi.plot(df.index, df['RSI'], color='purple', label='RSI (14)')
+    ax_rsi.axhline(70, color='red', linestyle='--', label='Overbrought (70)')
+    ax_rsi.axhline(30, color='green', linestyle='--', label='Oversold (30)')
+    ax_rsi.set_title(f"{ticker} Relative Strength Index (RSI)")
+    ax_rsi.legend(loc='lower left')
+    ax_rsi.grid(True, linestyle='--', alpha=0.5)
+    st.pyplot(fig_sma)
+
 
     st.markdown("---")
-    st.header("Technical Analysis Indicators")
-
-    # Moving Averages Calculation
-    df['SMA_50']
+    st.header("Multi-Stock Portoflio Comparison")
