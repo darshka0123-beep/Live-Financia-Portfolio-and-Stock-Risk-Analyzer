@@ -165,9 +165,28 @@ if st.session_state.run_analysis:
             correlation_matrix = comp_returns.corr()
 
             # Display Correlation Heatmap
-            st.subheader("Stock Return Correlation Matrix")
-            fig_corr, ax_corr = plt.subplots(figsize=(6,4))
-            sns.heatmap(correlation_matrix, annot=True, cmap= "coolwarm", vmin=-1, vmax=1, ax=ax_corr)
+            num_tickers = len(tickers)
+            fig_size = max(6, num_tickers * 0.7) # Grows larger when more tickers are selected
+
+            fig_corr, ax_corr = plt.subplots(figsize=(fig_size, fig_size * 0.7))
+
+            # Add fmt=".2f" to round numbers, annot_kws to shrink  text size, and cbar_kws to scale the colorbar
+            sns.heatmap(
+                correlation_matrix,
+                annot=True,
+                fmt=".2f",
+                annot_kws={"size": max(7, 12 - num_tickers)}, # Shrinks text as you add more tickets to fit it
+                cmap="coolwarm",
+                vmin=-1,
+                vmax=1,
+                linewidths=0.5,
+                ax=ax_corr,
+            )
+
+            # Rotate labels so they don't overlap on the axes
+            plt.xticker(rotation=45, ha='right')
+            plt.yticks(rotation=0)
+
             st.pyplot(fig_corr)
 
         # Monte Carlo Risk Simulation
