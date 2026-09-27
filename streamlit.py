@@ -75,23 +75,43 @@ if st.session_state.run_analysis:
         col4.metric("Max Drawdown", f"{max_drawdown * 100:.2f}%")
         
         st.markdown("---")
-        
-        # Display Charts
-        st.subheader("Visual Analysis Dashboard")
-        st.markdown("---")
         st.header("Technical Analysis Indicators")
-        
+
         # Moving Averages Calculation
         df['SMA_50'] = df['Close'].rolling(window=50).mean()
         df['SMA_200'] = df['Close'].rolling(window=200).mean()
-        
+
         # RSI Calculation (14 day window)
         delta = df['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0,0)).rolling(window=14).mean()
         rs = gain / loss
         df['RSI'] = 100 - (100 / (1 + rs))
-
+        
+        # Plot SMA Chart
+        fig_sma, ax_sma = plt.subplots(figsize=(10,4))
+        ax_sma.plot(df.index, df['Close'], label='Close Price', alpha=0.5)
+        ax_sma.plot(df.index, df['SMA_50'], label='50-Day SMA', color='orange')
+        ax_sma.plot(df.index, df['SMA_200'], label='200 Day SMA', color='red')
+        ax_sma.set_title(f"{ticker} Moving Averages")
+        ax_sma.legend()
+        ax_sma.grid(True, linestyle='--', alpha=0.5)
+        ax_sma.grid(True, linestyle='--', alpha=0.5)
+        st.pyplot(fig_sma)
+        
+        # Plot RSI Chart
+        fig_rsi, ax_rsi = plt.subplots(figsize=(10,3))
+        ax_rsi.plot(df.index, df['RSI'], color='purple', label='RSI (14)')
+        ax_rsi.axhline(70, color='red', linestyle='--', label='Overbrought (70)')
+        ax_rsi.axhline(30, color='green', linestyle='--', label='Oversold (30)')
+        ax_rsi.set_title(f"{ticker} Relative Strength Index (RSI)")
+        ax_rsi.legend(loc='lower left')
+        ax_rsi.grid(True, linestyle='--', alpha=0.5)
+        st.pyplot(fig_rsi)
+        
+        st.markdown("---")
+        st.header("Visual Analysis Dashboard")
+       
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
         
         # Top Panel: Price
@@ -101,7 +121,7 @@ if st.session_state.run_analysis:
         ax1.legend(loc='upper left')
         ax1.grid(True, linestyle='--', alpha=0.5)
         
-        # Middle Panel, Daily Returns
+        # Middle Panel: Daily Returns
         ax2.plot(df.index, df['Daily_Return'], color="#79ee9c", alpha=0.6, label='Daily Returns')
         ax2.axhline(0, color='black', linestyle='--', linewidth=0.8)
         ax2.set_ylabel("Daily Change")
@@ -119,9 +139,13 @@ if st.session_state.run_analysis:
         st.pyplot(fig)
 
         # Multiselect widget for comparing multiple tickers
+
+        st.markdown("---")
+        st.header("Multi-Stock Portfolio Comaparison")
+
         tickers = st.multiselect(
             "Select stocks to compare:",
-            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "SPY"],
+            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "BRK-B", "GE", "DIS"],
             default=["AAPL", "MSFT", "SPY"],
         )
 
@@ -159,13 +183,13 @@ if st.session_state.run_analysis:
             daily_std = clean_returns.std()
 
             # Matrix to store simulation results
-            simulation_matrix = np.zeroes((time_horizon, num_simulations))
+            simulation_matrix = np.zeros((time_horizon, num_simulations))
 
             for i in range(num_simulations):
                 prices = [last_price]
                 for t in range(1, time_horizon):
                     # Generate random return using normal distribution
-                    simulated_return = np.randpm.normal(daily_mean, daily_std)
+                    simulated_return = np.random.normal(daily_mean, daily_std)
                     prices.append(prices[-1] * (1 + simulated_return))
                 simulation_matrix[:, i] = prices
 
@@ -183,32 +207,3 @@ if st.session_state.run_analysis:
             max_expected_loss_pct = ((percentile_5th - last_price) / last_price) * 100
 
             st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
-
-
-if st.sidebar.buttons("Run Risk Analysis"):
-    df = get_stock_data(ticker, start_date, end_date)
-
-    # Plot SMA Chart
-    fig_sma, ax_sma = plt.subplots(figsize=(10,4))
-    ax_sma.plot(df.index, df['Close'], label='Close Price', alpha=0.5)
-    ax_sma.plot(df.index, df['SMA_50'], label='50-Day SMA', color='orange')
-    ax_sma.plot(df.index, df['SMA_200'], label='200 Day SMA', color='red')
-    ax_sma.set_title(f"{ticker} Moving Averages")
-    ax_sma.legend()
-    ax_sma.grid(True, linestyle='--', alpha=0.5)
-    ax_sma.grid(True, linestyle='--', alpha=0.5)
-    st.pyplot(fig_sma)
-
-    # Plot RSI Chart
-    fig_rsi, ax_rsi = plt.subplots(figsizes=(10,3))
-    ax_rsi.plot(df.index, df['RSI'], color='purple', label='RSI (14)')
-    ax_rsi.axhline(70, color='red', linestyle='--', label='Overbrought (70)')
-    ax_rsi.axhline(30, color='green', linestyle='--', label='Oversold (30)')
-    ax_rsi.set_title(f"{ticker} Relative Strength Index (RSI)")
-    ax_rsi.legend(loc='lower left')
-    ax_rsi.grid(True, linestyle='--', alpha=0.5)
-    st.pyplot(fig_sma)
-
-
-    st.markdown("---")
-    st.header("Multi-Stock Portoflio Comparison")
