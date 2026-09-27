@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import nltk
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 # Page Setup
 st.set_page_config(page_title="Live Financial Portfolio and Stock Risk Analyzer", layout="wide")
@@ -184,7 +186,7 @@ if st.session_state.run_analysis:
             )
 
             # Rotate labels so they don't overlap on the axes
-            plt.xticker(rotation=45, ha='right')
+            plt.xticks(rotation=45, ha='right')
             plt.yticks(rotation=0)
 
             st.pyplot(fig_corr)
@@ -226,3 +228,33 @@ if st.session_state.run_analysis:
             max_expected_loss_pct = ((percentile_5th - last_price) / last_price) * 100
 
             st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
+
+            # Download VADER lexicon (runs once automatically)
+            nltk.download('vader_lexicon', quiet=True)
+
+            st.markdown("---")
+            st.header(f"Live News & Sentiment Analysis for {ticker}")
+
+            # Fetch Stock news from yfinance
+            stock = yf.Ticker(ticker)
+            news_list = stock.news
+
+            if not news_list:
+                st.info(f"No recent news found for {ticker}.")
+            else:
+                sia = SentimentIntensityAnalyzer()
+
+                # Store aggregated scores
+                compound_scores = []
+
+                st.subheader("Latest Headlines")
+
+                for item in news_list[:5]: # Display top 5 latest headlines
+                    # Get article details from yfinance news object
+                    title = item.get('title', 'No Title')
+                    publisher = item.get('publisher', 'Unknown')
+                    link = item.get('link', '#')
+
+                    # Analyze headline sentiment
+                    sentiment = sia.polarity_scores(title)
+                    compound = sentiment
