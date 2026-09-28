@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import plotly.graph_objects as g_obj
+from scipy.optimize import minimize
 
 # Page Setup
 st.set_page_config(page_title="Live Financial Portfolio and Stock Risk Analyzer", layout="wide")
@@ -147,9 +149,150 @@ if st.session_state.run_analysis:
 
         tickers = st.multiselect(
             "Select stocks to compare:",
-            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "BRK-B", "GE", "DIS"],
+            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "BRK-B", "GE", "DIS", "NVDA"],
             default=["AAPL", "MSFT", "SPY"],
         )
+
+        st.markdown("---")
+        st.header(f"Company Profile & Fundamentals for {ticker}")
+
+        stock_info = yf.Ticker(ticker).info
+
+        # Company Metrics Summary
+        fund_col1, fund_col2, fund_col3, fund_col4 = st.columns(4)
+
+        market_cap = stock_info.get('trailingPE', 'N/A')
+        if isinstance(market_cap, (int, float)):
+            market_cap = f"${market_cap / 1e9:.2f}B"
+
+        pe_ratio = stock_info.get('trailingPE', 'N/A')
+        if isinstance(pe_ratio, (int, float)):
+            pe_ratio = f"{pe_ratio:.2f}"
+
+        div_yield = stock_info.get('dividendYield', 'N/A')
+        if isinstance(pe_ratio, (int, float)):
+            div_yield = f"{div_yield * 100:.2f}%"
+
+        fifty_two_high = stock_info.get('fiftyTwoWeekHigh', 'N/A')
+        if isinstance(fifty_two_high, (int, float)):
+            fifty_two_high = f"${fifty_two_high:.2f}"
+
+        fund_col1.metric("Market Cap", market_cap)
+        fund_col2.metric("P/E Ratio", pe_ratio)
+        fund_col3.metric("Dividend Yield", div_yield)
+        fund_col4.metric("52-Week High", fifty_two_high)
+
+        with st.expander("Company Business Summary"):
+            st.write(stock_info.get('longBusinessSummary', 'No summary available.'))
+
+        # Interactive Candlestick Chart and Bollinger Bands and MACD
+        st.markdown("---")
+        st.header("Interactive Technical Analysis (PlotLy)")
+
+        # Calculate Bollinger Bands
+        df['20_SMA'] = df['Close'].rolling(window=20).mean()
+        df['20_STD'] = df['Close'].rolling(window=20).mean()
+        df['Upper_Band'] = df['20_SMA'] + (df['20_STD'] * 2)
+        df['Lower_Band'] = df['20_SMA'] - (df['20_STD'] * 2)
+
+        # Calculate MACD
+        exp1 = df['Close'].ewm(span=12, adjust=False).mean()
+        exp2 = df['Close'].ewm(span=26, adjust=False).mean()
+        df['MACD'] = exp1 - exp2
+        df['Signal_Line'] = df['MACD'].ewm(span=9, adjust=False).mean()
+
+        # Interactive Candlestick Plot
+        fig_candle = g_obj.Figure()
+
+        # Add Candlestick trace (requires Open, High, Low, Close from yfinance)
+        full_stock_df = yf.Ticker(ticker).history(start=start_date, end=end_date)
+        if not full_stock_df.empty:
+            fig_candle.add_trace(g_obj.Candlestick(
+                x=full_stock_df.index,
+                open=full_stock_df['Open'],
+                high=full_stock_df['High'],
+                low=full_stock_df['Low'],
+                close=full_stock_df['Close'],
+                name="Price OHLC"
+            ))
+
+        # Overlay Bollinger Bands
+        fig_candle.add_trace(g_obj.Scatter(x=df.index, y=df['Upper_Band'], line=dict(color='grey', width=1), name='Upper Band'))
+        fig_candle.add_trace(g_obj.Scatter(x=df.index, y=df['Lower_Band'], line=dict(color='grey', width=1), name='Lower Band'))
+
+        fig_candle.update_layout(
+            title=f"{ticker} Interactive Price & Bollinger Bands",
+            yaxis_title="Stock Price($)",
+            xaxis_rangeslider_visible=False
+        )
+        st.plotly_chart(fig_candle, use_container_width=True)
+
+        # Plot MACD Subchart
+        fig_macd = g_obj.Figure()
+        fig_macd.add_trace(g_obj.Scatter(x=df.index, y=df['MACD'], line=dict(color='blue', width=1.5), name='MACD'))
+        fig_macd.add_trace(g_obj.Scatter(x=df.index, y=df['Signal_Line'], line=dict(color='orange', width=1.5), name='Signal Line'))
+        fig_macd.update_layout(title="MACD (Moving Average Convergence Divergence)", yaxis_title='Value', height=300)
+        st.plotly_chart(fig_macd, use_container_width=True)
+
+        # Efficient Frontier & Portfolio Optimization
+        st.markdown("---")
+        st.header("Portfolio Optimization (Max Sharpe Ratio)")
+
+        opt_tickers = st.multiselect("Select assets for portfolio optimization:", ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "SPY"], default=["AAPL", "MSFT", "SPY"])
+
+        if len(opt_tickers) >=2:
+            opt_data = yf.download(opt_tickers, start=start_date, end=end_date)['Close']
+            opt_returns = opt_data.pct_change().dropna()
+            mean_returns = opt_returns.mean() * 252
+            cov_matrix = opt_returns.cov() * 252
+
+            # Optimization function
+            def negative_sharpe(weights):
+                p_return = np.sum(mean_returns * weights)
+                p_vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+                return -(p_return - risk_free_rate) / p_vol
+            num_assets = len(opt_tickers)
+            constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) -1})
+            bounds = tuple((0,1) for _ in range(num_assets))
+            initial_weights = num_assets * [1. / num_assets,]
+
+            opt_results = minimize(negative_sharpe, initial_weights, method='SLSQP', bounds=bounds, constraints=constraints)
+
+            if opt_results.success:
+                optimal_weights = opt_results.x
+                st.subheader("Optimal Asset Weights (Max Sharpe Ratio)")
+
+                weight_col1, weight_col2 = st.columns(2)
+                with weight_col1:
+                    for t_symbol, w_val in zip(opt_tickers, optimal_weights):
+                        st.write(f"**{t_symbol}:**{w_val} * 100:.2f")
+
+                with weight_col2:
+                    opt_return = np.sum(mean_returns * optimal_weights)
+                    opt_vol = np.sqrt(np.dot(optimal_weights.T, np.dot(cov_matrix, optimal_weights)))
+                    opt_sharpe = (opt_return - risk_free_rate) / opt_vol
+
+                    st.metric("Expected Portfolio Return", f"{opt_return * 100:.2f}%")
+                    st.metric("Expected Portfolio Volatility", f"{opt_vol * 100:.2f}%")
+                    st.metric("Maximized Sharpe Ratio", f"{opt_sharpe:.2f}")
+
+        # Export Options
+        st.markdown("---")
+        st.header("Export Summary Data")
+
+        # Convert Historical metrics dataframe to CSV
+        csv_data = df.to_csv().encode('utf-8')
+
+        st.download_button(
+            label=f"Download {ticker} Historical Analysis.csv",
+            data=csv_data,
+            file_name=f"{ticker}_financial_analysis.csv",
+            mime="text/csv",
+        )
+
+
+        
+
 
         if tickers:
             # Download data for all the selected tickers at the same time
@@ -292,3 +435,5 @@ if st.session_state.run_analysis:
                         st.error(f"**Overall Sentiment: Bearish** (Average Score: {avg_score:.2f})")
                     else:
                         st.warning(f"**Overall Sentiment: Neutral** (Average Score: {avg_score:.2f})")
+
+    
