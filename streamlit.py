@@ -235,26 +235,60 @@ if st.session_state.run_analysis:
             st.markdown("---")
             st.header(f"Live News & Sentiment Analysis for {ticker}")
 
-            # Fetch Stock news from yfinance
+            # Fetch stock news from yfinance
             stock = yf.Ticker(ticker)
             news_list = stock.news
 
             if not news_list:
-                st.info(f"No recent news found for {ticker}.")
+                st.info(f"No recent news found or {ticker}.")
             else:
                 sia = SentimentIntensityAnalyzer()
-
-                # Store aggregated scores
                 compound_scores = []
 
                 st.subheader("Latest Headlines")
 
-                for item in news_list[:5]: # Display top 5 latest headlines
-                    # Get article details from yfinance news object
-                    title = item.get('title', 'No Title')
-                    publisher = item.get('publisher', 'Unknown')
-                    link = item.get('link', '#')
+                for item in news_list[:5]: 
+                    content = item.get('content', item)
+
+                    title = content.get('title', 'No Title')
+                    publisher = content.get('provider', {}).get('displayName', 'Unknown')
+
+                    # Extract article link
+                    click_through = content.get('canonicalUrl', {})
+                    link = click_through.get('url', '#') if isinstance(click_through, dict) else '#'
 
                     # Analyze headline sentiment
                     sentiment = sia.polarity_scores(title)
-                    compound = sentiment
+                    compound = sentiment['compound']
+                    compound_scores.append(compound)
+
+                    # Categorize sentiment and set custom badge colors
+                    if compound >= 0.05:
+                        sentiment_label = "Bullish"
+                        color_hex = "#28a745" # Green
+                    elif compound <= -0.05:
+                        sentiment_label = "Bearish"
+                        color_hex = "#dc3545" # Red
+                    else: 
+                        sentiemnt_label = "Neutral"
+                        color_hex = "#6c757d" # Grey
+
+                    # Display Headline entry
+                    col1, col2 = st.columns([4,1])
+                    with col1:
+                        st.markdown(f"**[{title}]({link})**")
+                        st.caption(f"Score: {compound:.2f}")
+
+                    st.markdown("---")
+
+                # Overall Sentiment Summary Badge
+                if compound_scores:
+                    avg_score = np.mean(compound_scores)
+                    st.subheader("Overall Market Sentiment")
+
+                    if avg_score >= 0.05:
+                        st.success(f"**Overall Sentiment: Bullish** (Average Score: {avg_score:.2f})")
+                    elif avg_score<= - 0.05:
+                        st.error(f"**Overall Sentiment: Bearish** (Average Score: {avg_score:.2f})")
+                    else:
+                        st.warning(f"**Overall Sentiment: Neutral** (Average Score: {avg_score:.2f})")
