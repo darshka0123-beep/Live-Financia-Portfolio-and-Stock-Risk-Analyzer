@@ -7,6 +7,7 @@ import seaborn as sns
 import nltk
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import plotly.graph_objects as g_obj
+import plotly.express as px
 from scipy.optimize import minimize
 
 # Page Setup
@@ -275,6 +276,65 @@ if st.session_state.run_analysis:
                     st.metric("Expected Portfolio Return", f"{opt_return * 100:.2f}%")
                     st.metric("Expected Portfolio Volatility", f"{opt_vol * 100:.2f}%")
                     st.metric("Maximized Sharpe Ratio", f"{opt_sharpe:.2f}")
+
+        # Advanced Downside Risk Metrics
+        st.markdown("---")
+        st.subheader(f"Downside Risk Analytics for {ticker}")
+
+        # Sortino Ratio (Focuses only on downside volatility)
+        downside_returns = clean_returns[clean_returns < 0]
+        downside_volatility = downside_returns.std() * (252 ** 0.5)
+
+        if downside_volatility != 0:
+            sortino_ratio = (annual_return - risk_free_rate) / downside_volatility
+        else:
+            sortino_ratio = 0.0
+
+        # Maximum Drawdown Duration (In Trading Days)
+        is_drawdown = df['Drawdown'] < 0
+        drawdown_periods = (~is_drawdown).cumsum()[is_drawdown]
+        if not drawdown_periods.empty:
+            max_drawdown_days = drawdown_periods.value_counts().max()
+        else:
+            max_drawdown_days = 0
+
+        col_sort1, col_sort2, col_sort3 = st.columns(3)
+        col_sort1.metric("Sortino Ratio", f"{sortino_ratio:.2f}", help="Measures risk-adjusted return relative to downside volatility.")
+        col_sort2.metric("Downside Volatility", f"{downside_volatility * 100:.2f}%")
+        col_sort3.metric("Max Drawdown Duration", f"{max_drawdown_days} Days", help="Longest consecutive period spent in drawdown.")
+
+        # Portfolio Allocation Donut Chart (Using g_obi)
+        if 'optimal_weights' in locals() and len(opt_tickers) >= 2:
+            st.subheader("Optimal Asset Allocation Visualizer")
+
+            pie_fig = g_obj.Figure(data=[g_obj.Pie(
+                labels=opt_tickers,
+                values=optimal_weights * 100,
+                hole=.4,
+            )])
+            pie_fig.update_layout(title_text="Optimal Portfolio Weight Distribution")
+            st.plotly_chart(pie_fig, use_container_width=True)
+
+        # Benchmark Comparison Overlay (Using g_obj)
+        st.markdown("---")
+        st.subheader(f"{ticker} vs. S&P 500 (SPY) Relative Growth")
+
+        spy_data = yf.Ticker("SPY").history(start=start_date, end=end_date)[['Close']]
+
+        if not spy_data.empty and not df.empty:
+            norm_stock = (df['Close'] / df['Close'].iloc[0]) * 100
+            norm_spy = (spy_data['Close'] / spy_data['Close'].iloc[0]) * 100
+
+            benchmark_fig = g_obj.Figure()
+            benchmark_fig.add_trace(g_obj.Scatter(x=df.index, y=norm_stock, name=ticker, line=dict(width=2)))
+            benchmark_fig.add_trace(g_obj.Scatter(x=spy_data.index, y=norm_spy, name="S&P 500 (SPY)", line=dict(dash='dash', color='grey')))
+
+            benchmark_fig.update_layout(
+                yaxis_title="Growth of $100 Initial Investment",
+                xaxis_title="Date",
+                hovermode="x unified"
+            )
+            st.plotly_chart(benchmark_fig, use_container_width=True)        
 
         # Export Options
         st.markdown("---")
