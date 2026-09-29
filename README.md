@@ -13,3 +13,6 @@ As someone who is currently studying for DECA and is learning a lot more about f
 # Challenges 
 Clicking buttons kept resetting the variables which broke the exports. Using session state helped fix that. 
 Ran into small syntax bugs. I used claude occasionally when I really couldn't find it but for the most part, I could recheck and read the errors and figure out the bugs.
+
+# Streamlit link
+https://live-financia-portfolio-and-stock-risk-analyzer-ca4s6rr8ahqs7g.streamlit.app/
