@@ -522,5 +522,3 @@ if st.session_state.run_analysis:
                         st.error(f"**Overall Sentiment: Bearish** (Average Score: {avg_score:.2f})")
                     else:
                         st.warning(f"**Overall Sentiment: Neutral** (Average Score: {avg_score:.2f})")
-
-    
