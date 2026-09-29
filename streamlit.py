@@ -522,42 +522,5 @@ if st.session_state.run_analysis:
                         st.error(f"**Overall Sentiment: Bearish** (Average Score: {avg_score:.2f})")
                     else:
                         st.warning(f"**Overall Sentiment: Neutral** (Average Score: {avg_score:.2f})")
-        st.markdown("---")
-        st.header("Export Summary Data")
-
-        col_exp1, col_exp2 = st.columns(2)
-
-        with col_exp1:
-            hist_csv = df.to_csv().encode('utf-8')
-            st.download_button(
-                label=f" Export {ticker} Technical indicators (CSV)",
-                data=hist_csv,
-                file_name=f"{ticker}_indicators.csv",
-                mime="text/csv"
-            )
-
-        with col_exp2:
-            if 'simulation_matrix' in st.session_state:
-                sim_df = pd.DataFrame+(st.session_state['simulation_matrix'])
-                sim_csv = sim_df.to_csv().encode('utf-8')
-                st.download_button(
-                    label="Export Monte Carlo Simulated Paths (CSV)",
-                    data=sim_csv,
-                    file_name=f"{ticker}_monte_carlo_paths.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("Run Monte Carlo simulation above to enable CSV export.")
-
-
-        # Convert Historical metrics dataframe to CSV
-        csv_data = df.to_csv().encode('utf-8')
-
-        st.download_button(
-            label=f"Download {ticker} Historical Analysis.csv",
-            data=csv_data,
-            file_name=f"{ticker}_financial_analysis.csv",
-            mime="text/csv",
-        )
 
     
