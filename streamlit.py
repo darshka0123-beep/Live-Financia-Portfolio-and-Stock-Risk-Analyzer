@@ -150,7 +150,7 @@ if st.session_state.run_analysis:
 
         tickers = st.multiselect(
             "Select stocks to compare:",
-            ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "BRK-B", "GE", "DIS", "NVDA"],
+            ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "BRK-B", "GE", "DIS", "NVDA", "HD", "SBUX", "MS", "NKE", "WMT", "CRWD", "AMC", "NU", "SPCX", "GRAB", "PLUG", "AAL", "NOK", "SOFI", "ONDS", "PATH", "AGNC", "RKT", "F", "WBD", "AUR", "HL", "RIG", "KOD", "CDE", "IONQ", "TSLA", "IVZ", "HAYW", "NWSA", "PHYS", "GILD", "SO", "ADBE", "CRM", "CSCO", "ORCL", "INTU","INTC" "AVGA", "QCOM", "TXN", "MU", "BAC", "WFC", "C", "GS", "BLK", "V", "MA", "PYPL", "HOOD", "JNJ", "LLY", "PFE", "MRK", "UNH", "ABV", "TMO", "COST", "TGT", "LOW", "MCD", "KO", "PEP", "CMG", "SONY", "CAT", "HON", "MMM", "XOM", "CVX", "GM", "RIVN", "LCID", "VOO", "IVV", "IWM", "DIA", "VTI", "PG", "TJX", "LULU", "ABT", "FEDX", "UPS", "PLTR", "TSM", "UBER", "PANW", "SHOP", "SPOT", "SQ", "SNOW", "DELL", "LUV", "WOOF", "CAKE", "EAT", "FIZZ", "TAP", "HOG", "FUN", "UNP", "AXP", "NEE", "DE", "LMT", "RTX", "COP", "VUG", "VYM", "XLK", "XLF", "SCHD", "RACE", "MAR", "BKNG", "ABNB", "DAL", "REGN", "ISRG", "ZTS", "CVS", "MDT"],
             default=["AAPL", "MSFT", "SPY"],
         )
 
@@ -378,46 +378,7 @@ if st.session_state.run_analysis:
             fig_rsi_hm, ax_rsi_hm = plt.subplots(figsize=(8,1.5))
             sns.heatmap(latest_rsi, annot=True, fmt=".1f", cmap="RdYlGn_r", vmin=20, vmax=80, cbar=False, ax=ax_rsi_hm)
             plt.title("Current 14-day RSI Levels (<30 Oversold, >70 Overbought)")
-            st.pylot(fig_rsi_hm)
-
-        # Export Options
-        st.markdown("---")
-        st.header("Export Summary Data")
-
-        col_exp1, col_exp2 = st.columns(2)
-
-        with col_exp1:
-            hist_csv = df.to_csv().encode('utf-8')
-            st.download_button(
-                label=f" Export {ticker} Technical indicators (CSV)",
-                data=hist_csv,
-                file_name=f"{ticker}_indicators.csv",
-                mime="text/csv"
-            )
-
-        with col_exp2:
-            if 'simulation_matrix' in st.session_state:
-                sim_df = pd.DataFrames(st.session_state['simulation_matrix'])
-                sim_csv = sim_df.to_csv().encode('utf-8')
-                st.download_button(
-                    label="Export Monte Carlo Simulated Paths (CSV)",
-                    data=sim_csv,
-                    file_name=f"{ticker}_monte_carlo_paths.csv",
-                    mime="text/csv"
-                )
-            else:
-                st.info("Run Monte Carlo simulation above to enable CSV export.")
-
-
-        # Convert Historical metrics dataframe to CSV
-        csv_data = df.to_csv().encode('utf-8')
-
-        st.download_button(
-            label=f"Download {ticker} Historical Analysis.csv",
-            data=csv_data,
-            file_name=f"{ticker}_financial_analysis.csv",
-            mime="text/csv",
-        )
+            st.pyplot(fig_rsi_hm)
 
         if tickers:
             # Download data for all the selected tickers at the same time
@@ -482,7 +443,7 @@ if st.session_state.run_analysis:
                     prices.append(prices[-1] * (1 + simulated_return))
                 simulation_matrix[:, i] = prices
             st.session_state['simulation_matrix'] = simulation_matrix
-            
+
             # Plot Simulation Paths
             fig_mc, ax_mc = plt.subplots(figsize=(10,5))
             ax_mc.plot(simulation_matrix, color='blue', alpha=0.03)
@@ -561,5 +522,42 @@ if st.session_state.run_analysis:
                         st.error(f"**Overall Sentiment: Bearish** (Average Score: {avg_score:.2f})")
                     else:
                         st.warning(f"**Overall Sentiment: Neutral** (Average Score: {avg_score:.2f})")
+        st.markdown("---")
+        st.header("Export Summary Data")
+
+        col_exp1, col_exp2 = st.columns(2)
+
+        with col_exp1:
+            hist_csv = df.to_csv().encode('utf-8')
+            st.download_button(
+                label=f" Export {ticker} Technical indicators (CSV)",
+                data=hist_csv,
+                file_name=f"{ticker}_indicators.csv",
+                mime="text/csv"
+            )
+
+        with col_exp2:
+            if 'simulation_matrix' in st.session_state:
+                sim_df = pd.DataFrame(st.session_state['simulation_matrix'])
+                sim_csv = sim_df.to_csv().encode('utf-8')
+                st.download_button(
+                    label="Export Monte Carlo Simulated Paths (CSV)",
+                    data=sim_csv,
+                    file_name=f"{ticker}_monte_carlo_paths.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("Run Monte Carlo simulation above to enable CSV export.")
+
+
+        # Convert Historical metrics dataframe to CSV
+        csv_data = df.to_csv().encode('utf-8')
+
+        st.download_button(
+            label=f"Download {ticker} Historical Analysis.csv",
+            data=csv_data,
+            file_name=f"{ticker}_financial_analysis.csv",
+            mime="text/csv",
+        )
 
     
