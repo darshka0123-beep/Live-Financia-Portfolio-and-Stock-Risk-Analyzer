@@ -343,6 +343,7 @@ if st.session_state.run_analysis:
         info = yf.Ticker(ticker).info
 
         f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+
         # Safely pulll financial ratios
         forward_pe = info.get('forwardPE', 'N/A')
         peg_ratio = info.get('pegRatio', 'N/A')
@@ -358,10 +359,55 @@ if st.session_state.run_analysis:
         f_col2.metric("PEG Ratio", peg_ratio)
         f_col3.metric("Price to Book", price_to_book)
         f_col4.metric("Profit Margin", profit_margins)
-         
+
+        # RSI Cross Asset Comparison
+        if 'tickers' in locals() and len(tickers) >= 2:
+            st.subheader("Cross-Asset RSI Momentum Tracker")
+
+            comp_data = yf.download(tickers, start=start_date, end=end_date)['Close']
+
+            # Calculate 14 day RSI for all assets
+            delta = comp_data.diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs= gain / loss
+            rsi_df = 100 - (100 / (1 + rs))
+
+            latest_rsi = rsi_df.iloc[-1].to_frame(name="Latest RSI (14)").T
+
+            fig_rsi_hm, ax_rsi_hm = plt.subplots(figsize=(8,1.5))
+            sns.heatmap(latest_rsi, annot=True, fmt=".1f", cmap="RdYlGn_r", vmin=20, vmax=80, cbar=False, ax=ax_rsi_hm)
+            plt.title("Current 14-day RSI Levels (<30 Oversold, >70 Overbought)")
+            st.pylot(fig_rsi_hm)
+
         # Export Options
         st.markdown("---")
         st.header("Export Summary Data")
+
+        col_exp1, col_exp2 = st.columns(2)
+
+        with col_exp1:
+            hist_csv = df.to_csv().encode('utf-8')
+            st.download_button(
+                label=f" Export {ticker} Technical indicators (CSV)",
+                data=hist_csv,
+                file_name=f"{ticker}_indicators.csv",
+                mime="text/csv"
+            )
+
+        with col_exp2:
+            if 'simulation_matrix' in st.session_state:
+                sim_df = pd.DataFrames(st.session_state['simulation_matrix'])
+                sim_csv = sim_df.to_csv().encode('utf-8')
+                st.download_button(
+                    label="Export Monte Carlo Simulated Paths (CSV)",
+                    data=sim_csv,
+                    file_name=f"{ticker}_monte_carlo_paths.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.info("Run Monte Carlo simulation above to enable CSV export.")
+
 
         # Convert Historical metrics dataframe to CSV
         csv_data = df.to_csv().encode('utf-8')
@@ -372,10 +418,6 @@ if st.session_state.run_analysis:
             file_name=f"{ticker}_financial_analysis.csv",
             mime="text/csv",
         )
-
-
-        
-
 
         if tickers:
             # Download data for all the selected tickers at the same time
@@ -439,7 +481,8 @@ if st.session_state.run_analysis:
                     simulated_return = np.random.normal(daily_mean, daily_std)
                     prices.append(prices[-1] * (1 + simulated_return))
                 simulation_matrix[:, i] = prices
-
+            st.session_state['simulation_matrix'] = simulation_matrix
+            
             # Plot Simulation Paths
             fig_mc, ax_mc = plt.subplots(figsize=(10,5))
             ax_mc.plot(simulation_matrix, color='blue', alpha=0.03)
