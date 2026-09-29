@@ -334,8 +334,31 @@ if st.session_state.run_analysis:
                 xaxis_title="Date",
                 hovermode="x unified"
             )
-            st.plotly_chart(benchmark_fig, use_container_width=True)        
+            st.plotly_chart(benchmark_fig, use_container_width=True) 
 
+        # Institutional Fundamentals Section
+        st.markdown("---")
+        st.header(f"Detailed Valuation & Financial Health for {ticker}")
+
+        info = yf.Ticker(ticker).info
+
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        # Safely pulll financial ratios
+        forward_pe = info.get('forwardPE', 'N/A')
+        peg_ratio = info.get('pegRatio', 'N/A')
+        price_to_book = info.get('priceToBook', 'N/A')
+        profit_margins = info.get('profitMargins', 'N/A')
+
+        if isinstance(forward_pe, (int, float)): forward_pe = f"{forward_pe:.2f}"
+        if isinstance(peg_ratio, (int, float)): peg_ratio = f"{peg_ratio:.2f}"
+        if isinstance(price_to_book, (int, float)): price_to_book = f"{price_to_book:.2f}"
+        if isinstance(profit_margins, (int, float)): profit_margins = f"{profit_margins * 100:.2f}%"
+
+        f_col1.metric("Forward P/E", forward_pe)
+        f_col2.metric("PEG Ratio", peg_ratio)
+        f_col3.metric("Price to Book", price_to_book)
+        f_col4.metric("Profit Margin", profit_margins)
+         
         # Export Options
         st.markdown("---")
         st.header("Export Summary Data")
