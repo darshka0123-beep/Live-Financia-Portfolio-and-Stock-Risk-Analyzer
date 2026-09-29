@@ -538,7 +538,7 @@ if st.session_state.run_analysis:
 
         with col_exp2:
             if 'simulation_matrix' in st.session_state:
-                sim_df = pd.DataFrame(st.session_state['simulation_matrix'])
+                sim_df = pd.DataFrame+(st.session_state['simulation_matrix'])
                 sim_csv = sim_df.to_csv().encode('utf-8')
                 st.download_button(
                     label="Export Monte Carlo Simulated Paths (CSV)",
