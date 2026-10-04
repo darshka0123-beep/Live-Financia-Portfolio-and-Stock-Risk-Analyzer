@@ -23,8 +23,7 @@
           ],
           entrypoint: "app.py",
           files: {
-            "app.py": `
-import json
+            "app.py": `import json
 import time
 from io import StringIO
 import urllib.parse
@@ -94,10 +93,10 @@ def fetch_ticker_info(symbol):
     return {
         "longName": f"{symbol.upper()} Corporation",
         "fullExchangeName": "US Equity Market",
-        "marketCap": "\\$2.85 T",
+        "marketCap": "$2.85 T",
         "trailingPE": "28.5",
         "trailingAnnualDividendYield": "0.55%",
-        "fiftyTwoWeekHigh": "\\$199.62"
+        "fiftyTwoWeekHigh": "$199.62"
     }
 
 if 'run_analysis' not in st.session_state:
@@ -166,9 +165,9 @@ if st.session_state.run_analysis:
         
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
         
-        ax1.plot(df.index, df['Close'], color="#D20FB5", linewidth=1.5, label='Close Price (\\$)')
+        ax1.plot(df.index, df['Close'], color="#D20FB5", linewidth=1.5, label='Close Price ($)')
         ax1.set_title(f"{ticker} Historical Performance", fontsize=12, fontweight='bold')
-        ax1.set_ylabel("Price (\\$)") 
+        ax1.set_ylabel("Price ($)") 
         ax1.legend(loc='upper left')
         ax1.grid(True, linestyle='--', alpha=0.5)
         
@@ -252,7 +251,7 @@ if st.session_state.run_analysis:
             fig_mc, ax_mc = plt.subplots(figsize=(10, 5))
             ax_mc.plot(simulation_matrix, color='blue', alpha=0.03)
             ax_mc.set_title(f"1,000 Simulated Price Paths for {ticker} over Next 30 Days")
-            ax_mc.set_ylabel("Simulated Prices (\\$)")
+            ax_mc.set_ylabel("Simulated Prices ($)")
             ax_mc.set_xlabel("Days Ahead")
             st.pyplot(fig_mc)
 
@@ -260,7 +259,7 @@ if st.session_state.run_analysis:
             percentile_5th = np.percentile(ending_prices, 5)
             max_expected_loss_pct = ((percentile_5th - last_price) / last_price) * 100
 
-            st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **\\${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
+            st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
 `
           }
         },
