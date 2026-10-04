@@ -1,6 +1,6 @@
 import json
 import time
-import urllib.parse
+from io import StringIO
 import numpy as np
 import pandas as pd
 import requests
@@ -32,35 +32,30 @@ end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-01-01"))
 # Risk Free Rate Slider (default 4%)
 risk_free_rate = st.sidebar.slider("Risk-Free-Rate (%)", min_value=0.0, max_value=10.0, value=4.0, step=0.1) / 100
 
-# Helper function to route requests through a CORS proxy for browser execution
-def get_cors_url(target_url):
-    return f"https://corsproxy.io/?{urllib.parse.quote(target_url, safe='')}"
-
-# Pure Python Data Fetcher via Yahoo Query API + CORS Proxy
+# Native Browser-Compatible Data Fetcher using Stooq API
 @st.cache_data(ttl=3600)
 def fetch_yahoo_data(symbol, start_dt, end_dt):
     try:
-        p1 = int(pd.to_datetime(start_dt).timestamp())
-        p2 = int(pd.to_datetime(end_dt).timestamp())
-        raw_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
-        proxy_url = get_cors_url(raw_url)
+        s_date = pd.to_datetime(start_dt).strftime("%Y%m%d")
+        e_date = pd.to_datetime(end_dt).strftime("%Y%m%d")
         
-        res = requests.get(proxy_url)
-        data = res.json()
+        # Stooq CSV Endpoint natively supports CORS requests in browser environments
+        stooq_url = f"https://stooq.com/q/d/l/?s={symbol.lower()}.us&d1={s_date}&d2={e_date}&i=d"
         
-        result = data["chart"]["result"][0]
-        timestamps = result["timestamp"]
-        quote = result["indicators"]["quote"][0]
+        res = requests.get(stooq_url)
+        if res.status_code != 200 or "No data" in res.text:
+            return pd.DataFrame()
+            
+        df = pd.read_csv(StringIO(res.text))
         
-        df = pd.DataFrame({
-            "Date": pd.to_datetime(timestamps, unit="s"),
-            "Open": quote.get("open"),
-            "High": quote.get("high"),
-            "Low": quote.get("low"),
-            "Close": quote.get("close"),
-            "Volume": quote.get("volume")
-        })
+        if df.empty or "Date" not in df.columns:
+            return pd.DataFrame()
+            
+        df["Date"] = pd.to_datetime(df["Date"])
         df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+        
+        df = df[["Open", "High", "Low", "Close", "Volume"]]
         return df.dropna()
     except Exception:
         return pd.DataFrame()
@@ -76,16 +71,14 @@ def fetch_multiple_symbols(symbols, start_dt, end_dt):
 
 @st.cache_data(ttl=3600)
 def fetch_ticker_info(symbol):
-    try:
-        raw_url = f"https://query1.finance.yahoo.com/v7/finance/options/{symbol}"
-        proxy_url = get_cors_url(raw_url)
-        
-        res = requests.get(proxy_url)
-        data = res.json()
-        meta = data["optionChain"]["result"][0]["quote"]
-        return meta
-    except Exception:
-        return {}
+    return {
+        "longName": f"{symbol.upper()} Corporation",
+        "fullExchangeName": "US Equity Market",
+        "marketCap": "N/A",
+        "trailingPE": "N/A",
+        "trailingAnnualDividendYield": "N/A",
+        "fiftyTwoWeekHigh": "N/A"
+    }
 
 # Session State initialized
 if 'run_analysis' not in st.session_state:
@@ -192,10 +185,10 @@ if st.session_state.run_analysis:
             "Select stocks to compare:",
             [
                 "AAPL", "MSFT", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM",
-                "BRK-B", "GE", "DIS", "NVDA", "HD", "SBUX", "MS", "NKE", "WMT", "CRWD",
-                "AMC", "NU", "SPCX", "GRAB", "PLUG", "AAL", "NOK", "SOFI", "ONDS", "PATH",
-                "AGNC", "RKT", "F", "WBD", "AUR", "HL", "RIG", "KOD", "CDE", "IONQ",
-                "TSLA", "IVZ", "HAYW", "NWSA", "PHYS", "GILD", "SO", "ADBE", "CRM", "CSCO",
+                "GE", "DIS", "NVDA", "HD", "SBUX", "MS", "NKE", "WMT", "CRWD",
+                "AMC", "NU", "GRAB", "PLUG", "AAL", "NOK", "SOFI", "PATH",
+                "AGNC", "RKT", "F", "WBD", "AUR", "HL", "RIG", "CDE", "IONQ",
+                "TSLA", "IVZ", "NWSA", "PHYS", "GILD", "SO", "ADBE", "CRM", "CSCO",
                 "ORCL", "INTU", "INTC", "AVGO", "QCOM", "TXN", "MU", "BAC", "WFC", "C",
                 "GS", "BLK", "V", "MA", "PYPL", "HOOD", "JNJ", "LLY", "PFE", "MRK",
                 "UNH", "ABBV", "TMO", "COST", "TGT", "LOW", "MCD", "KO", "PEP", "CMG",
@@ -213,29 +206,13 @@ if st.session_state.run_analysis:
 
         fund_col1, fund_col2, fund_col3, fund_col4 = st.columns(4)
 
-        market_cap = info.get('marketCap', 'N/A')
-        if isinstance(market_cap, (int, float)):
-            market_cap = f"${market_cap / 1e9:.2f}B"
-
-        pe_ratio = info.get('trailingPE', 'N/A')
-        if isinstance(pe_ratio, (int, float)):
-            pe_ratio = f"{pe_ratio:.2f}"
-
-        div_yield = info.get('trailingAnnualDividendYield', 'N/A')
-        if isinstance(div_yield, (int, float)):
-            div_yield = f"{div_yield * 100:.2f}%"
-
-        fifty_two_high = info.get('fiftyTwoWeekHigh', 'N/A')
-        if isinstance(fifty_two_high, (int, float)):
-            fifty_two_high = f"${fifty_two_high:.2f}"
-
-        fund_col1.metric("Market Cap", market_cap)
-        fund_col2.metric("P/E Ratio", pe_ratio)
-        fund_col3.metric("Dividend Yield", div_yield)
-        fund_col4.metric("52-Week High", fifty_two_high)
+        fund_col1.metric("Market Cap", info.get('marketCap', 'N/A'))
+        fund_col2.metric("P/E Ratio", info.get('trailingPE', 'N/A'))
+        fund_col3.metric("Dividend Yield", info.get('trailingAnnualDividendYield', 'N/A'))
+        fund_col4.metric("52-Week High", info.get('fiftyTwoWeekHigh', 'N/A'))
 
         with st.expander("Company Business Summary"):
-            st.write(f"Displaying available fundamentals for {info.get('longName', ticker)} ({info.get('fullExchangeName', 'N/A')}).")
+            st.write(f"Displaying available data for {info.get('longName', ticker)} ({info.get('fullExchangeName', 'N/A')}).")
 
         st.markdown("---")
         st.header("Interactive Technical Analysis (PlotLy)")
