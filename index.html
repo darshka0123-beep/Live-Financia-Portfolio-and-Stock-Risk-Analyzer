@@ -59,10 +59,7 @@ def fetch_yahoo_data(symbol, start_dt, end_dt):
         s_date = pd.to_datetime(start_dt).strftime("%Y%m%d")
         e_date = pd.to_datetime(end_dt).strftime("%Y%m%d")
         
-        # Base Stooq URL
         stooq_url = f"https://stooq.com/q/d/l/?s={symbol.lower()}.us&d1={s_date}&d2={e_date}&i=d"
-        
-        # Pass through CORS proxy so GitHub Pages / Browser JS can access it
         proxy_url = f"https://corsproxy.io/?{urllib.parse.quote(stooq_url, safe='')}"
         
         res = requests.get(proxy_url)
@@ -97,10 +94,10 @@ def fetch_ticker_info(symbol):
     return {
         "longName": f"{symbol.upper()} Corporation",
         "fullExchangeName": "US Equity Market",
-        "marketCap": "$2.85 T",
+        "marketCap": "\\$2.85 T",
         "trailingPE": "28.5",
         "trailingAnnualDividendYield": "0.55%",
-        "fiftyTwoWeekHigh": "$199.62"
+        "fiftyTwoWeekHigh": "\\$199.62"
     }
 
 if 'run_analysis' not in st.session_state:
@@ -115,7 +112,6 @@ if st.session_state.run_analysis:
     if df.empty:
         st.error(f"No Data found for ticker '{ticker}'. Please check the symbol and try again.")
     else:
-        # Quant Calculations
         df['Daily_Return'] = df['Close'].pct_change()
         df['Volatility_21D'] = df['Daily_Return'].rolling(window=21).std() * (252 ** 0.5)
         df['Cumulative_Return'] = (1 + df['Daily_Return']).cumprod()
@@ -170,9 +166,9 @@ if st.session_state.run_analysis:
         
         fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
         
-        ax1.plot(df.index, df['Close'], color="#D20FB5", linewidth=1.5, label='Close Price ($)')
+        ax1.plot(df.index, df['Close'], color="#D20FB5", linewidth=1.5, label='Close Price (\\$)')
         ax1.set_title(f"{ticker} Historical Performance", fontsize=12, fontweight='bold')
-        ax1.set_ylabel("Price ($)") 
+        ax1.set_ylabel("Price (\\$)") 
         ax1.legend(loc='upper left')
         ax1.grid(True, linestyle='--', alpha=0.5)
         
@@ -233,7 +229,6 @@ if st.session_state.run_analysis:
                         st.metric("Expected Portfolio Volatility", f"{opt_vol * 100:.2f}%")
                         st.metric("Maximized Sharpe Ratio", f"{opt_sharpe:.2f}")
 
-        # Monte Carlo Simulation
         st.markdown("---")
         st.header("Monte Carlo Risk Simulation (30-Day Outlook)")
 
@@ -257,7 +252,7 @@ if st.session_state.run_analysis:
             fig_mc, ax_mc = plt.subplots(figsize=(10, 5))
             ax_mc.plot(simulation_matrix, color='blue', alpha=0.03)
             ax_mc.set_title(f"1,000 Simulated Price Paths for {ticker} over Next 30 Days")
-            ax_mc.set_ylabel("Simulated Prices ($)")
+            ax_mc.set_ylabel("Simulated Prices (\\$)")
             ax_mc.set_xlabel("Days Ahead")
             st.pyplot(fig_mc)
 
@@ -265,7 +260,7 @@ if st.session_state.run_analysis:
             percentile_5th = np.percentile(ending_prices, 5)
             max_expected_loss_pct = ((percentile_5th - last_price) / last_price) * 100
 
-            st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
+            st.error(f"**95% Value at Risk (VaR):** There is a 5% chance {ticker} drops below **\\${percentile_5th:.2f}** over the next 30 days (a loss of **{max_expected_loss_pct:.2f}%**).")
 `
           }
         },
