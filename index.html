@@ -53,22 +53,32 @@ risk_free_rate = st.sidebar.slider("Risk-Free-Rate (%)", min_value=0.0, max_valu
 @st.cache_data(ttl=3600)
 def fetch_yahoo_data(symbol, start_dt, end_dt):
     try:
-        # Generating synthetic price data for browser compatibility without CORS issues
-        dates = pd.date_range(start=start_dt, end=end_dt, freq='B')
-        if len(dates) == 0:
+        s_date = pd.to_datetime(start_dt).strftime("%Y%m%d")
+        e_date = pd.to_datetime(end_dt).strftime("%Y%m%d")
+        
+        # Base Stooq URL
+        stooq_url = f"https://stooq.com/q/d/l/?s={symbol.lower()}.us&d1={s_date}&d2={e_date}&i=d"
+        
+        # Pass through CORS proxy so GitHub Pages / Browser JS can access it
+        proxy_url = f"https://corsproxy.io/?{requests.utils.quote(stooq_url)}"
+        
+        res = requests.get(proxy_url)
+        if res.status_code != 200 or "No data" in res.text:
             return pd.DataFrame()
             
-        np.random.seed(abs(hash(symbol)) % 10000)
-        returns = np.random.normal(0.0005, 0.015, size=len(dates))
-        price_path = 150.0 * np.exp(np.cumsum(returns))
+        df = pd.read_csv(StringIO(res.text))
         
-        df = pd.DataFrame({
-            'Open': price_path * (1 - 0.005),
-            'High': price_path * (1 + 0.01),
-            'Low': price_path * (1 - 0.01),
-            'Close': price_path,
-            'Volume': np.random.randint(1000000, 10000000, size=len(dates))
-        }, index=dates)
+        if df.empty or "Date" not in df.columns:
+            return pd.DataFrame()
+            
+        df["Date"] = pd.to_datetime(df["Date"])
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+        
+        df = df[["Open", "High", "Low", "Close", "Volume"]]
+        return df.dropna()
+    except Exception:
+        return pd.DataFrame()
         
         return df
     except Exception:
