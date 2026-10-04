@@ -19,6 +19,7 @@
             "seaborn",
             "plotly",
             "scipy",
+            "requests",
             "micropip"
           ],
           entrypoint: "app.py",
@@ -27,8 +28,10 @@
 import json
 import time
 from io import StringIO
+import urllib.parse
 import numpy as np
 import pandas as pd
+import requests
 import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -60,7 +63,7 @@ def fetch_yahoo_data(symbol, start_dt, end_dt):
         stooq_url = f"https://stooq.com/q/d/l/?s={symbol.lower()}.us&d1={s_date}&d2={e_date}&i=d"
         
         # Pass through CORS proxy so GitHub Pages / Browser JS can access it
-        proxy_url = f"https://corsproxy.io/?{requests.utils.quote(stooq_url)}"
+        proxy_url = f"https://corsproxy.io/?{urllib.parse.quote(stooq_url, safe='')}"
         
         res = requests.get(proxy_url)
         if res.status_code != 200 or "No data" in res.text:
@@ -77,10 +80,6 @@ def fetch_yahoo_data(symbol, start_dt, end_dt):
         
         df = df[["Open", "High", "Low", "Close", "Volume"]]
         return df.dropna()
-    except Exception:
-        return pd.DataFrame()
-        
-        return df
     except Exception:
         return pd.DataFrame()
 
