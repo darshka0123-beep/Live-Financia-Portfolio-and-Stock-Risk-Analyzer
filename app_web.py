@@ -1,5 +1,6 @@
 import json
 import time
+import urllib.parse
 import numpy as np
 import pandas as pd
 import requests
@@ -31,15 +32,21 @@ end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2024-01-01"))
 # Risk Free Rate Slider (default 4%)
 risk_free_rate = st.sidebar.slider("Risk-Free-Rate (%)", min_value=0.0, max_value=10.0, value=4.0, step=0.1) / 100
 
-# Pure Python Data Fetcher replacing yfinance
+# Helper function to route requests through a CORS proxy for browser execution
+def get_cors_url(target_url):
+    return f"https://corsproxy.io/?url={urllib.parse.quote(target_url, safe='')}"
+
+# Pure Python Data Fetcher via Yahoo Query API + CORS Proxy
 @st.cache_data(ttl=3600)
 def fetch_yahoo_data(symbol, start_dt, end_dt):
     try:
         p1 = int(pd.to_datetime(start_dt).timestamp())
         p2 = int(pd.to_datetime(end_dt).timestamp())
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
+        raw_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
+        proxy_url = get_cors_url(raw_url)
+        
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers)
+        res = requests.get(proxy_url, headers=headers)
         data = res.json()
         
         result = data["chart"]["result"][0]
@@ -71,9 +78,11 @@ def fetch_multiple_symbols(symbols, start_dt, end_dt):
 @st.cache_data(ttl=3600)
 def fetch_ticker_info(symbol):
     try:
-        url = f"https://query1.finance.yahoo.com/v7/finance/options/{symbol}"
+        raw_url = f"https://query1.finance.yahoo.com/v7/finance/options/{symbol}"
+        proxy_url = get_cors_url(raw_url)
+        
         headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(url, headers=headers)
+        res = requests.get(proxy_url, headers=headers)
         data = res.json()
         meta = data["optionChain"]["result"][0]["quote"]
         return meta
@@ -183,7 +192,19 @@ if st.session_state.run_analysis:
 
         tickers = st.multiselect(
             "Select stocks to compare:",
-            ["AAPL", "MSFT", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM", "NVDA", "TSLA"],
+            [
+                "AAPL", "MSFT", "AMZN", "GOOGL", "META", "SPY", "NFLX", "AMD", "QQQ", "JPM",
+                "BRK-B", "GE", "DIS", "NVDA", "HD", "SBUX", "MS", "NKE", "WMT", "CRWD",
+                "AMC", "NU", "SPCX", "GRAB", "PLUG", "AAL", "NOK", "SOFI", "ONDS", "PATH",
+                "AGNC", "RKT", "F", "WBD", "AUR", "HL", "RIG", "KOD", "CDE", "IONQ",
+                "TSLA", "IVZ", "HAYW", "NWSA", "PHYS", "GILD", "SO", "ADBE", "CRM", "CSCO",
+                "ORCL", "INTU", "INTC", "AVGO", "QCOM", "TXN", "MU", "BAC", "WFC", "C",
+                "GS", "BLK", "V", "MA", "PYPL", "HOOD", "JNJ", "LLY", "PFE", "MRK",
+                "UNH", "ABBV", "TMO", "COST", "TGT", "LOW", "MCD", "KO", "PEP", "CMG",
+                "SONY", "CAT", "HON", "MMM", "XOM", "CVX", "GM", "RIVN", "LCID", "VOO",
+                "IVV", "IWM", "DIA", "VTI", "PG", "TJX", "LULU", "ABT", "FDX", "UPS",
+                "PLTR", "TSM", "UBER", "PANW", "SHOP", "SPOT", "SQ", "SNOW", "DELL", "LUV"
+            ],
             default=["AAPL", "MSFT", "SPY"],
         )
 
@@ -216,7 +237,7 @@ if st.session_state.run_analysis:
         fund_col4.metric("52-Week High", fifty_two_high)
 
         with st.expander("Company Business Summary"):
-            st.write(f"Displaying fundamentals for {info.get('longName', ticker)} ({info.get('fullExchangeName', 'N/A')}).")
+            st.write(f"Displaying available fundamentals for {info.get('longName', ticker)} ({info.get('fullExchangeName', 'N/A')}).")
 
         st.markdown("---")
         st.header("Interactive Technical Analysis (PlotLy)")
@@ -431,7 +452,6 @@ if st.session_state.run_analysis:
             st.markdown("---")
             st.header(f"Live Sentiment Analysis for {ticker}")
 
-            # Lightweight VADER analysis fallback
             try:
                 sia = SentimentIntensityAnalyzer()
             except Exception:
