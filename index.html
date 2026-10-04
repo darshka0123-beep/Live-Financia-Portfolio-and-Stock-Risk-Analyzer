@@ -61,7 +61,6 @@ def fetch_yahoo_data(symbol, start_dt, end_dt):
         stooq_url = f"https://stooq.com/q/d/l/?s={symbol.lower()}.us&d1={s_date}&d2={e_date}&i=d"
         proxy_url = f"https://corsproxy.io/?{urllib.parse.quote(stooq_url, safe='')}"
         
-        # Native Pyodide synchronous HTTP fetch
         res_text = pyodide.http.open_url(proxy_url).read()
         
         if not res_text or "No data" in res_text:
