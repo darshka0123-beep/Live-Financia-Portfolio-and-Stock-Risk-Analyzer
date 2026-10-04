@@ -34,7 +34,7 @@ risk_free_rate = st.sidebar.slider("Risk-Free-Rate (%)", min_value=0.0, max_valu
 
 # Helper function to route requests through a CORS proxy for browser execution
 def get_cors_url(target_url):
-    return f"https://corsproxy.io/?url={urllib.parse.quote(target_url, safe='')}"
+    return f"https://corsproxy.io/?{urllib.parse.quote(target_url, safe='')}"
 
 # Pure Python Data Fetcher via Yahoo Query API + CORS Proxy
 @st.cache_data(ttl=3600)
@@ -45,8 +45,7 @@ def fetch_yahoo_data(symbol, start_dt, end_dt):
         raw_url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?period1={p1}&period2={p2}&interval=1d"
         proxy_url = get_cors_url(raw_url)
         
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(proxy_url, headers=headers)
+        res = requests.get(proxy_url)
         data = res.json()
         
         result = data["chart"]["result"][0]
@@ -81,8 +80,7 @@ def fetch_ticker_info(symbol):
         raw_url = f"https://query1.finance.yahoo.com/v7/finance/options/{symbol}"
         proxy_url = get_cors_url(raw_url)
         
-        headers = {"User-Agent": "Mozilla/5.0"}
-        res = requests.get(proxy_url, headers=headers)
+        res = requests.get(proxy_url)
         data = res.json()
         meta = data["optionChain"]["result"][0]["quote"]
         return meta
